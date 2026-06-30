@@ -1,0 +1,83 @@
+# =============================================================================
+# import-linter — mechanical enforcement of the Clean Architecture Dependency
+# Rule (ADR-0001). A violated import is a CI build failure, not a review nit.
+#
+# Run with:  lint-imports
+# =============================================================================
+
+[importlinter]
+root_package = aiplatform
+
+# -----------------------------------------------------------------------------
+# Contract 1 — core layered ordering (domain < application < infrastructure).
+#
+# Higher layers may import lower layers, never the reverse: domain imports
+# nothing outward, application imports only domain, infrastructure may implement
+# domain ports. `interface` and `composition` are governed by the forbidden
+# contracts below rather than this ordering (composition is the exempt root that
+# imports everything; interface is delivery that imports composition).
+# -----------------------------------------------------------------------------
+[importlinter:contract:layers]
+name = Core layered dependency rule (domain < application < infrastructure)
+type = layers
+layers =
+    aiplatform.infrastructure
+    aiplatform.application
+    aiplatform.domain
+
+# -----------------------------------------------------------------------------
+# Contract 2 — inner-layer purity.
+#
+# domain / application / infrastructure must never import the outer composition
+# root or the interface (delivery) layer. Keeps the dependency direction inward.
+# -----------------------------------------------------------------------------
+[importlinter:contract:inner-purity]
+name = Inner layers must not import composition or interface
+type = forbidden
+source_modules =
+    aiplatform.domain
+    aiplatform.application
+    aiplatform.infrastructure
+forbidden_modules =
+    aiplatform.composition
+    aiplatform.interface
+
+# -----------------------------------------------------------------------------
+# Contract 2b — interface must not import provider adapters or config directly.
+#
+# The interface (delivery) layer receives providers and settings ONLY via the
+# wired container from the composition root (ADR-0002); it must never import a
+# concrete provider adapter (`infrastructure.llm`) or read configuration
+# (`infrastructure.config`) itself. It MAY use the cross-cutting logging /
+# correlation kernel (`infrastructure.logging`), which every layer needs —
+# this is what enables request-boundary correlation-id propagation.
+# -----------------------------------------------------------------------------
+[importlinter:contract:interface-no-adapters]
+name = Interface must not import provider adapters or config
+type = forbidden
+# Only DIRECT imports are forbidden: the interface reaching infrastructure
+# transitively *through the composition root* is the sanctioned path (that is
+# what composition exists for). A route that imports a concrete adapter or reads
+# config itself is a direct import and is rejected.
+allow_indirect_imports = True
+source_modules =
+    aiplatform.interface
+forbidden_modules =
+    aiplatform.infrastructure.llm
+    aiplatform.infrastructure.config
+
+# -----------------------------------------------------------------------------
+# Contract 3 — settings must stay logging-free.
+#
+# Configuration loads BEFORE logging is configured, so the dependency must never
+# reverse (dependency-matrix circular-risk analysis). Both packages live in the
+# infrastructure layer, so the layered contract above cannot catch this; this
+# dedicated forbidden contract mechanizes the M1.1 guard.
+# -----------------------------------------------------------------------------
+[importlinter:contract:settings-log-free]
+name = Settings must not import logging
+type = forbidden
+source_modules =
+    aiplatform.infrastructure.config
+forbidden_modules =
+    aiplatform.infrastructure.logging
