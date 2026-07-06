@@ -17,6 +17,16 @@ Pre-1.0 releases are tagged per milestone as `vMAJOR.MINOR.PATCH-mN`.
   supported providers, testing strategy, roadmap, and milestone status).
 
 ### Added
+- **M2.0 — Conversation aggregate** (`domain/conversation`): domain-generated,
+  type-distinct `ConversationId`/`MessageId`; an immutable, append-only `Message`
+  entity (explicit sequence, injected timezone-aware timestamps) distinct from the
+  transport `ChatMessage`; and the `Conversation` aggregate root enforcing
+  sequence contiguity, the single-leading-system-message rule, and a non-empty
+  owner, with `start()`/`reconstitute()` running identical invariant checks
+  (ADR-0007). 100% coverage on the new package.
+- **Clock port seam** (`application/clock.py`): a `runtime_checkable` `Clock`
+  Protocol reserved ahead of its M2.3 consumer, so the application layer never
+  reads the system clock directly and use cases stay deterministic.
 - **Milestone 2 architecture package** (design only, no implementation):
   ADR-0007 (Conversation & Message aggregates), ADR-0008 (persistence —
   repository contract, transaction boundary, relational mapping), ADR-0009

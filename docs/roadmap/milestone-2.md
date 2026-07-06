@@ -30,6 +30,12 @@ Foundational: [0005](../adr/0005-repository-strategy.md) (repository strategy).
 | M2.5 | PostgreSQL repository | SQLAlchemy models + mapping + Alembic; same contract suite green against real Postgres in CI |
 | M2.6 | Hardening & gates | Dependency-rule updates, coverage, docs, exit review |
 
+> **Reserved ahead of schedule:** the `application/clock.py` `Clock` port (the
+> application's source of "now") is introduced now, before its M2.3 consumer, so
+> the application layer never reaches for `datetime.now()` directly and use cases
+> stay deterministic. The domain already takes injected, timezone-aware timestamps
+> (ADR-0007); this is the seam that will supply them.
+
 The order is dependency-driven: the aggregate (M2.0) precedes the repository
 (M2.1); the repository and contract suite exist before the SQL implementation
 (M2.5) so the swap is a binding change; memory/assembly (M2.2) precede the use case
@@ -56,8 +62,9 @@ M2.2  application/conversation/token_estimator.py TokenEstimator port + heuristi
       application/conversation/context_window.py  ContextWindowPolicy
       application/conversation/prompt_assembler.py PromptAssembler -> CompletionRequest
 
-M2.3  application/conversation/transaction.py     minimal atomic() scope (port)
-      application/conversation/chat_service.py     the chat use case
+M2.3  application/clock.py                          Clock port (source of "now") — RESERVED EARLY
+      application/conversation/transaction.py     minimal atomic() scope (port)
+      application/conversation/chat_service.py     the chat use case (consumes Clock)
       infrastructure/persistence/memory/transaction.py  copy-on-commit scope
 
 M2.4  interface/http/routes/conversations.py       create / append / fetch endpoints
