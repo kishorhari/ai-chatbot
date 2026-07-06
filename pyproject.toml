@@ -11,9 +11,20 @@ version = "0.1.0"
 description = "Enterprise AI assistant platform — Clean Architecture core with a provider-agnostic LLM port."
 readme = "README.md"
 requires-python = ">=3.13"
-license = { text = "Proprietary" }
-authors = [{ name = "AI Platform Team" }]
-keywords = ["clean-architecture", "llm", "ollama", "fastapi"]
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "kishorhari" }]
+keywords = [
+    "clean-architecture",
+    "hexagonal-architecture",
+    "ports-and-adapters",
+    "llm",
+    "ollama",
+    "fastapi",
+    "pydantic",
+    "structlog",
+    "ai-platform",
+]
 
 # Runtime deps only. Per ADR-0002 nothing above the infrastructure layer may
 # import a vendor SDK or httpx; these libraries are wired strictly behind ports.
@@ -50,10 +61,6 @@ packages = ["src/aiplatform"]
 line-length = 100
 target-version = "py313"
 src = ["src", "tests"]
-# `app/` is a pre-architecture prototype, outside the approved src/aiplatform
-# structure and out of Milestone 1 scope. Excluded from the new tooling; slated
-# for removal in a later chore commit.
-extend-exclude = ["app"]
 
 [tool.ruff.lint]
 # E/F pyflakes+pycodestyle, I import sorting, N naming, UP pyupgrade,
