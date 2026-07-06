@@ -67,7 +67,11 @@ None — this is the base.
 
 ## Milestone 2 — Conversation & persistence
 
-**Status:** 🔜 Next.
+**Status:** 🔜 Next — architecture package ratified. See
+[`docs/roadmap/milestone-2.md`](docs/roadmap/milestone-2.md) and
+ADR-[0007](docs/adr/0007-conversation-message-aggregate.md) /
+[0008](docs/adr/0008-persistence-repository-and-transactions.md) /
+[0009](docs/adr/0009-context-window-and-prompt-assembly.md). Implementation not yet started.
 
 ### Goal
 Introduce conversation identity and durable message history behind a repository
