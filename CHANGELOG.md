@@ -17,6 +17,12 @@ Pre-1.0 releases are tagged per milestone as `vMAJOR.MINOR.PATCH-mN`.
   supported providers, testing strategy, roadmap, and milestone status).
 
 ### Added
+- **Milestone 2 architecture package** (design only, no implementation):
+  ADR-0007 (Conversation & Message aggregates), ADR-0008 (persistence —
+  repository contract, transaction boundary, relational mapping), ADR-0009
+  (context-window selection & prompt assembly), and
+  `docs/roadmap/milestone-2.md` (sub-milestones, dependency graph, file order,
+  Definition of Done, exit criteria, risks, trade-offs).
 - `ROADMAP.md` — long-range plan (M1–M7) with goal, deliverables, exit criteria,
   risks, and dependencies per milestone.
 - `CONTRIBUTING.md` — development setup, branch strategy, Conventional Commits,
