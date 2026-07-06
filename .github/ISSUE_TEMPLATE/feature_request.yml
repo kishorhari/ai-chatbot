@@ -1,0 +1,54 @@
+name: Feature request
+description: Propose a capability or enhancement
+title: "feat: <short description>"
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Proposals should respect the architecture's boundaries. If your idea
+        introduces a new cross-layer dependency or changes a port/contract, note
+        that it likely needs an ADR (see [docs/adr](../tree/main/docs/adr)).
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What problem does this solve? Who needs it and why?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should change? Which layer(s) and port(s) does it touch?
+    validations:
+      required: true
+  - type: dropdown
+    id: milestone
+    attributes:
+      label: Related milestone
+      description: See ROADMAP.md.
+      options:
+        - "M2 — Conversation & persistence"
+        - "M3 — RAG"
+        - "M4 — Agents"
+        - "M5 — Integrations"
+        - "M6 — Multi-tenancy & SaaS"
+        - "M7 — Cloud providers"
+        - "Cross-cutting / unsure"
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches and why they were rejected.
+    validations:
+      required: false
+  - type: checkboxes
+    id: adr
+    attributes:
+      label: Architectural impact
+      options:
+        - label: This likely requires a new or amended ADR (changes a boundary, port, or contract).
+        - label: This can be added behind an existing port without a new dependency.
