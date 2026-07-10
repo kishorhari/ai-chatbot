@@ -13,8 +13,18 @@ M4**, not part of M2.
 
 **Governing ADRs:** [0007](../adr/0007-conversation-message-aggregate.md) (aggregate),
 [0008](../adr/0008-persistence-repository-and-transactions.md) (persistence),
-[0009](../adr/0009-context-window-and-prompt-assembly.md) (memory/assembly).
-Foundational: [0005](../adr/0005-repository-strategy.md) (repository strategy).
+[0009](../adr/0009-context-window-and-prompt-assembly.md) (memory/assembly),
+[0010](../adr/0010-application-service-layer.md) (application-service layer / use-case
+orchestration). Foundational: [0005](../adr/0005-repository-strategy.md) (repository strategy).
+
+> **Orchestration boundary (ADR-0010, ratified before M2.2).** `PromptAssembler`
+> (M2.2) is a **pure builder** — it turns resolved messages into a
+> `CompletionRequest` and does nothing else (no recall, persistence, provider call,
+> or transaction). All use-case orchestration (recall → window → assemble →
+> generate → persist-atomically) lives in the **application service** `chat_service`
+> (M2.3), which owns the transaction boundary. `chat_service` depends on
+> `PromptAssembler`, so it correctly follows it in implementation order; the ADR
+> fixes the boundary ahead of both without reordering the milestones.
 
 ---
 

@@ -17,6 +17,7 @@ Milestone 2 (conversation & persistence):
 - [ADR-0007: Conversation and Message Aggregates](adr/0007-conversation-message-aggregate.md)
 - [ADR-0008: Persistence — Repository Contract, Transaction Boundary, and Relational Mapping](adr/0008-persistence-repository-and-transactions.md)
 - [ADR-0009: Context-Window Selection and Prompt Assembly](adr/0009-context-window-and-prompt-assembly.md)
+- [ADR-0010: Application Service Layer (Use-Case Orchestration)](adr/0010-application-service-layer.md)
 
 ## Milestone 1 — Project Skeleton + LLM Provider
 - [Development Roadmap](roadmap/milestone-1.md) — sub-milestones, file order, exit criteria
