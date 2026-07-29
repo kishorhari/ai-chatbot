@@ -30,9 +30,11 @@ Milestone 2 (conversation & persistence):
 - [Exit-Criteria Review](milestone-1-exit-review.md) — each §5 criterion mapped to evidence
 - [Retrospective](milestone-1-retrospective.md) — what shipped, decisions, deferred items
 
-## Milestone 2 — Conversation & Persistence (in design)
+## Milestone 2 — Conversation & Persistence
 - [Development Roadmap](roadmap/milestone-2.md) — sub-milestones, file order, dependency graph, DoD, exit criteria, risks, trade-offs
-- Governed by ADR-0007 (aggregate), ADR-0008 (persistence), ADR-0009 (memory/assembly).
+- [Exit-Criteria Review](milestone-2-exit-review.md) — each §6 criterion mapped to evidence (M2.6)
+- [Retrospective](milestone-2-retrospective.md) — objective, concepts, ADRs, decisions, lessons
+- Governed by ADR-0007 (aggregate), ADR-0008 (persistence), ADR-0009 (memory/assembly), ADR-0010 (application-service layer).
 
 ## Status
 Milestone 1 is **implemented and accepted** — all nine exit criteria met (see the

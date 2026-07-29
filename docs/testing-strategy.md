@@ -73,3 +73,37 @@ proof that the abstraction is real (ADR-0004).
 Chat/memory/persistence behavior (later steps), live cloud providers (none exist
 yet), load/performance (premature), and HTTP streaming transport/SSE (arrives at
 roadmap Step 7).
+
+---
+
+## Milestone 2 addendum — the repository contract suite
+
+M2 adds a second shared behavioral suite, mirroring the provider contract suite:
+`tests/contract/repository_contract.py` defines `ConversationRepositoryContract`,
+the executable specification **every** `ConversationRepository` implementation must
+satisfy (ADR-0008). A backend opts in by subclassing it and overriding the
+`repository` fixture.
+
+**Invariants asserted** (11): add→get round-trip fidelity (ids, roles, sequence,
+timestamps, usage); empty-conversation round-trip; sequence-order preservation;
+not-found on `get`/`save`; already-exists on `add`; append-then-`save`
+persistence; **snapshot independence** (a mutation to a loaded aggregate never
+reaches storage until `save`, and never aliases another load); and isolation
+between conversations.
+
+**Backends bound to the one suite:**
+
+| Backend | Engine | Where it runs |
+|---------|--------|---------------|
+| `InMemoryConversationRepository` | in-process dict | local + CI |
+| `SqlAlchemyConversationRepository` | SQLite (`aiosqlite`) | local + CI — fast dev evidence |
+| `SqlAlchemyConversationRepository` | **real PostgreSQL** | **CI service container** (authoritative, ADR-0008) |
+
+SQLite is a *test engine only* — never a production or selectable backend. The
+authoritative equivalence proof is the identical suite green against real
+PostgreSQL in CI, gated on `AIP__TEST_POSTGRES_DSN` (skipped locally). A separate
+transaction-boundary test proves **real rollback** on the SQL path — the behavior
+the in-memory pass-through cannot demonstrate.
+
+Coverage target unchanged: `domain`/`application` ≥ 95% (M2: **100%**). A green
+repository suite across three backends matters more than any percentage.
