@@ -50,6 +50,17 @@ class LogFormat(StrEnum):
     JSON = "json"
 
 
+class PersistenceBackend(StrEnum):
+    """Selectable conversation-persistence backend (ADR-0008).
+
+    ``postgres`` is a valid, documented value but is only wired from M2.5; the
+    composition root fails fast if it is selected before then.
+    """
+
+    MEMORY = "memory"
+    POSTGRES = "postgres"
+
+
 class ServerSettings(BaseModel):
     """HTTP server bind configuration."""
 
@@ -124,6 +135,33 @@ class OllamaSettings(BaseModel):
         return value.rstrip("/")
 
 
+class PostgresSettings(BaseModel):
+    """PostgreSQL connection configuration.
+
+    ``dsn`` is the full async SQLAlchemy URL (e.g.
+    ``postgresql+asyncpg://user:password@host:5432/dbname``). It is a
+    :class:`SecretStr` because it embeds the password — it is never logged or
+    reprinted (ADR-0008). Required only when the ``postgres`` backend is selected.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    dsn: SecretStr | None = None
+
+
+class PersistenceSettings(BaseModel):
+    """Conversation-persistence configuration.
+
+    Selecting the backend is a configuration change only (ADR-0008), mirroring
+    provider selection.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    backend: PersistenceBackend = PersistenceBackend.MEMORY
+    postgres: PostgresSettings = Field(default_factory=PostgresSettings)
+
+
 class AppSettings(BaseSettings):
     """Root settings aggregate, populated from the environment and ``.env``.
 
@@ -148,6 +186,7 @@ class AppSettings(BaseSettings):
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     llm: LLMSettings = Field(default_factory=LLMSettings)
     ollama: OllamaSettings = Field(default_factory=OllamaSettings)
+    persistence: PersistenceSettings = Field(default_factory=PersistenceSettings)
 
     @property
     def is_local(self) -> bool:
