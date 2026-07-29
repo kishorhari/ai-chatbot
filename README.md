@@ -21,14 +21,21 @@ to leak into the business logic.** Everything is organized so that swapping Olla
 for a cloud model, or an in-memory store for PostgreSQL, is a wiring change at a
 single composition root, not a refactor that ripples through the codebase.
 
-Milestone 1 (`v0.1.0-m1`) delivers a complete, tested vertical slice of that
+Milestone 1 (`v0.1.0-m1`) delivered a complete, tested vertical slice of that
 foundation: configuration, structured logging, a streaming-first `LLMProvider`
 port, two independent provider implementations proven against one shared contract
 suite, the composition root that wires them, and HTTP + CLI delivery surfaces.
+Milestone 2 (`v0.2.0-m2`) added conversation identity and durable history behind
+a repository port proven across in-memory, SQLite, and real PostgreSQL, with an
+atomic chat turn. Milestone 3 (`v0.3.0-m3`, proposed) adds Retrieval-Augmented
+Generation as swappable infrastructure — embedding, vector-store, and
+knowledge-repository ports (pgvector + PostgreSQL in CI), behind an additive,
+config-toggled `ContextProvider` seam that leaves the M2 chat turn unchanged when
+disabled.
 
-This is intentionally **not** a feature-complete chatbot yet. It is the
-load-bearing core that every later feature — conversation memory, RAG, agents,
-multi-tenancy — is designed to sit on top of without disturbing it.
+Each capability is added **additively** on the load-bearing core — conversation
+memory, RAG, and, next, agents and multi-tenancy — without disturbing the frozen
+ports beneath it.
 
 ## Motivation — why this project exists
 
@@ -71,7 +78,17 @@ exit review and retrospective.
   clear message; secrets are `SecretStr` and are redacted from logs and reprs.
 - **Structured logging with request correlation.** One `correlation_id` flows from
   the HTTP boundary through every log record ([ADR-0006](docs/adr/0006-logging-cross-cutting-kernel.md)).
-- **Mechanically enforced architecture.** Four `import-linter` contracts run in CI;
+- **Durable conversations behind a repository port (M2).** A `Conversation`
+  aggregate with append-only history sits behind a `ConversationRepository` port
+  proven equivalent across in-memory, SQLite, and **real PostgreSQL** by one
+  contract suite; the chat turn is atomic (verified to a real DB rollback).
+- **Retrieval-Augmented Generation as swappable infrastructure (M3).** Embedding,
+  vector-store, and knowledge-repository ports — each proven by a shared contract
+  suite, with **pgvector** and **PostgreSQL** exercised in CI. RAG is an additive
+  `ContextProvider` seam on `ChatService` (Null Object default), toggled by
+  `AIP__KNOWLEDGE__ENABLED`; with RAG off, M2 behaviour is byte-for-byte identical.
+  A deterministic golden-dataset harness gates retrieval quality (recall@k).
+- **Mechanically enforced architecture.** Six `import-linter` contracts run in CI;
   the dependency rule cannot silently rot.
 
 ## Architecture overview
@@ -105,31 +122,34 @@ port → adapter → vendor.** Nothing above `infrastructure` ever names a vendo
 ```
 .
 ├── src/aiplatform/
-│   ├── domain/llm/            # Value objects, LLMProvider port, error taxonomy (pure)
-│   │   ├── messages.py        #   ChatMessage, Role
-│   │   ├── requests.py        #   CompletionRequest
-│   │   ├── responses.py       #   CompletionChunk, CompletionResult, TokenUsage
-│   │   ├── capabilities.py    #   ProviderCapabilities
-│   │   ├── errors.py          #   LLMError hierarchy
-│   │   └── ports.py           #   LLMProvider (stream_chat / complete_chat / capabilities)
-│   ├── application/llm/       # ProviderRegistry port (resolve by name / default)
+│   ├── domain/
+│   │   ├── llm/               # LLM value objects, LLMProvider port, error taxonomy (pure)
+│   │   ├── conversation/      # Conversation aggregate + Message, repository port (M2)
+│   │   └── knowledge/         # KnowledgeDocument aggregate, EmbeddingVector, retrieval VOs,
+│   │   │                      #   embedding/vector-store/knowledge-repository ports (M3)
+│   ├── application/
+│   │   ├── llm/               # ProviderRegistry port
+│   │   ├── conversation/      # ChatService, ConversationService, prompt pipeline, ContextProvider
+│   │   └── knowledge/         # Chunking, IndexingService, retriever, RetrievalService, enricher (M3)
 │   ├── infrastructure/
 │   │   ├── config/            # Fail-fast pydantic settings
 │   │   ├── logging/           # structlog setup + correlation-id contextvar
-│   │   └── llm/
-│   │       ├── echo/          # Reference provider — deterministic, no network
-│   │       └── ollama/        # Ollama adapter + transport→domain error mapping
+│   │   ├── llm/               # echo/ (reference) + ollama/ (real) providers
+│   │   ├── persistence/       # memory/ + sqlalchemy/ conversation repository & transactions (M2)
+│   │   └── knowledge/         # embedding (fake, ollama), vector (memory, pgvector), repository (M3)
 │   ├── composition/           # Composition root: container, bootstrap, registry wiring
 │   └── interface/
-│       ├── http/              # FastAPI app factory, lifespan, middleware, /health /ready
-│       └── cli/               # Dev probe that streams a prompt
+│       ├── http/              # FastAPI app: /health /ready, conversations, knowledge routes
+│       └── cli/               # Dev probe, chat, and ingest commands
+├── migrations/                # Alembic: conversation schema + pgvector extension & knowledge tables
 ├── tests/
 │   ├── unit/                  # Per-module logic in isolation
-│   ├── contract/              # Shared provider contract suite (run against every provider)
-│   └── integration/           # Ollama via respx + opt-in live (`-m live`)
+│   ├── contract/              # Shared contract suites (provider, repository, embedding, vector, knowledge)
+│   ├── integration/           # Real adapters via respx + opt-in live (`-m live`)
+│   └── eval/                  # Deterministic golden-dataset retrieval quality gate (M3.8)
 ├── docs/                      # ADRs, roadmap, dependency matrix, testing & git strategy
 ├── .github/workflows/ci.yml   # Lint → type-check → dependency rule → tests
-├── .importlinter              # The four enforced dependency contracts
+├── .importlinter              # The six enforced dependency contracts
 ├── pyproject.toml             # Package, dependencies, ruff/mypy/pytest/coverage config
 └── .env.example               # Every configuration key, documented
 ```
@@ -178,6 +198,16 @@ trade-offs accepted. Read them in order in [`docs/adr/`](docs/adr/):
 | [0004](docs/adr/0004-echo-provider.md) | Echo provider as the reference implementation | Accepted |
 | [0005](docs/adr/0005-repository-strategy.md) | Repository strategy (in-memory first, PostgreSQL later) | Accepted |
 | [0006](docs/adr/0006-logging-cross-cutting-kernel.md) | Logging/correlation as a cross-cutting kernel | Accepted |
+| [0007](docs/adr/0007-conversation-message-aggregate.md) | Conversation and Message aggregates | Accepted |
+| [0008](docs/adr/0008-persistence-repository-and-transactions.md) | Persistence — repository contract, transaction boundary, relational mapping | Accepted |
+| [0009](docs/adr/0009-context-window-and-prompt-assembly.md) | Context-window selection and prompt assembly | Accepted |
+| [0010](docs/adr/0010-application-service-layer.md) | Application service layer (use-case orchestration) | Accepted |
+| [0011](docs/adr/0011-knowledge-and-retrieval-architecture.md) | Knowledge & retrieval architecture (RAG) | Accepted |
+| [0012](docs/adr/0012-embedding-provider-abstraction.md) | Embedding provider abstraction | Accepted |
+| [0013](docs/adr/0013-vector-store-abstraction.md) | Vector store abstraction | Accepted |
+| [0014](docs/adr/0014-chunking-strategy.md) | Chunking strategy | Accepted |
+| [0015](docs/adr/0015-retrieval-and-prompt-enrichment.md) | Retrieval strategy & prompt enrichment (ContextProvider seam) | Accepted |
+| [0016](docs/adr/0016-knowledge-metadata-ingestion-and-persistence.md) | Knowledge metadata, ingestion & persistence | Accepted |
 
 ## Supported providers
 
@@ -246,15 +276,20 @@ Tests are organized as a taxonomy, each with a clear purpose
 | **Integration** | Real adapter against simulated transport (`respx`) and opt-in live Ollama | mocked / live | respx every push; live opt-in |
 | **Smoke** | End-to-end boot: app starts, `/ready` flips, CLI probe streams | none | nightly / pre-release |
 
-The **shared provider contract suite** is the centerpiece: it asserts the
-streaming/cancellation invariants and the error-taxonomy guarantee, and both Echo
-and Ollama must pass it. Coverage is treated as a diagnostic, not a goal — `domain`
-and `application` are at **100%**; the suite running green across two providers is
-the more meaningful signal.
+The **shared contract suite** pattern is the centerpiece, now applied to five
+abstractions: the LLM provider (Echo, Ollama), the conversation repository
+(in-memory, SQLite, PostgreSQL), and the M3 embedding, vector-store, and
+knowledge-repository ports (offline reference + real backend each, pgvector and
+PostgreSQL in CI). Coverage is a diagnostic, not a goal — `domain` and
+`application` sit at **99%**; the contract suites running green across every
+implementation are the more meaningful signal. M3 adds a deterministic
+golden-dataset **retrieval quality gate** (`tests/eval/`) proving recall@k on the
+offline path.
 
-**Milestone 1 results:** 200 offline tests pass (+3 opt-in live), four dependency
-contracts kept, `domain`/`application` at 100% coverage (96% overall). See the
-[exit-criteria review](docs/milestone-1-exit-review.md).
+**Current results (M3):** 489 offline tests pass (+ PostgreSQL/pgvector contract
+suites in CI, opt-in live Ollama excluded), **six** dependency contracts kept,
+`domain`/`application` at 99% coverage. See the
+[M3 exit-criteria review](docs/milestone-3-exit-review.md).
 
 ## Project roadmap
 
@@ -264,8 +299,8 @@ risks, and dependencies. Full detail in **[ROADMAP.md](ROADMAP.md)**.
 | Milestone | Theme | Status |
 |-----------|-------|:------:|
 | **M1** | Foundation — Clean Architecture, provider abstraction, streaming, contract testing, FastAPI + CLI | ✅ **Completed** (`v0.1.0-m1`) |
-| **M2** | Conversation identity, message aggregate, repository pattern, memory, PostgreSQL swap | 🔜 Next |
-| **M3** | RAG — vector DB, embeddings, PDF ingestion, semantic search | 🗓️ Planned |
+| **M2** | Conversation identity, message aggregate, repository pattern, memory, PostgreSQL swap | ✅ **Completed** (`v0.2.0-m2`) |
+| **M3** | RAG — embeddings, vector store (pgvector), chunking, retrieval, prompt enrichment, semantic search | ✅ **Completed** (`v0.3.0-m3`, proposed) |
 | **M4** | Agents — tool calling, planning, multi-step reasoning, agent memory | 🗓️ Planned |
 | **M5** | Integrations — ERPNext, WhatsApp, email, webhooks, background jobs | 🗓️ Planned |
 | **M6** | Multi-tenancy — auth, RBAC, organizations, billing, SaaS | 🗓️ Planned |
@@ -279,6 +314,24 @@ criteria are met with mapped evidence; see the
 [retrospective](docs/milestone-1-retrospective.md). Validated in practice: the
 dependency rule held across every sub-milestone, the port proved vendor-neutral
 against two providers, and provider selection is config-only.
+
+**Milestone 2 — Conversation & Persistence: complete and accepted (`v0.2.0-m2`).**
+Conversation identity and durable history behind a `ConversationRepository` port,
+proven equivalent across in-memory, SQLite, and real PostgreSQL by one contract
+suite (PostgreSQL in CI); an atomic chat turn verified to a real database
+rollback. See the [exit review](docs/milestone-2-exit-review.md) and
+[retrospective](docs/milestone-2-retrospective.md).
+
+**Milestone 3 — Knowledge Retrieval (RAG): complete, proposed for `v0.3.0-m3`.**
+All ten exit criteria met with mapped evidence. Embedding, vector-store, and
+knowledge-repository ports each proven by a shared contract suite (pgvector and
+PostgreSQL in CI); RAG is an additive `ContextProvider` seam on `ChatService`
+(Null Object default) toggled by config, so M2 behaviour is preserved unchanged
+when disabled; a deterministic golden-dataset harness gates retrieval recall@k.
+Six `import-linter` contracts enforce the dependency rule and the frozen M1/M2
+ports. See the [exit review](docs/milestone-3-exit-review.md),
+[retrospective](docs/milestone-3-retrospective.md), and
+[release readiness review](docs/milestone-3-release-readiness.md).
 
 ## Future vision
 

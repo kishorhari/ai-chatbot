@@ -105,3 +105,24 @@ forbidden_modules =
     sqlalchemy
     asyncpg
     alembic
+
+# -----------------------------------------------------------------------------
+# Contract 6 — the domain and application layers must remain vector-store and
+# embedding-SDK agnostic (ADR-0012/0013, the M3 analogue of contract 5).
+#
+# Embedding and vector search are infrastructure details behind the
+# EmbeddingProvider / VectorStore ports: the inner layers speak only in the
+# domain EmbeddingVector value object, never a vector client (`pgvector`) or a
+# numeric array library (`numpy`). The layered contract already blocks importing
+# the knowledge *adapters*; this additionally forbids the third-party libraries
+# directly, so retrieval stays a genuine seam.
+# -----------------------------------------------------------------------------
+[importlinter:contract:core-vector-agnostic]
+name = Domain and application must not import a vector or embedding SDK (pgvector, numpy)
+type = forbidden
+source_modules =
+    aiplatform.domain
+    aiplatform.application
+forbidden_modules =
+    pgvector
+    numpy
