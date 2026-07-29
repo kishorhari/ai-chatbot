@@ -18,7 +18,7 @@ from aiplatform.domain.llm.errors import LLMError
 
 from .lifespan import lifespan
 from .middleware import CorrelationIdMiddleware
-from .routes import conversations, health
+from .routes import conversations, health, knowledge
 
 
 def create_app() -> FastAPI:
@@ -36,6 +36,7 @@ def create_app() -> FastAPI:
     app.add_middleware(CorrelationIdMiddleware)
     app.include_router(health.router)
     app.include_router(conversations.router)
+    app.include_router(knowledge.router)
     _register_exception_handlers(app)
     return app
 
