@@ -7,7 +7,7 @@ build-backend = "hatchling.build"
 # ---------------------------------------------------------------------------
 [project]
 name = "aiplatform"
-version = "0.1.0"
+version = "0.3.0"
 description = "Enterprise AI assistant platform — Clean Architecture core with a provider-agnostic LLM port."
 readme = "README.md"
 requires-python = ">=3.13"
