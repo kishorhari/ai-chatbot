@@ -8,7 +8,11 @@ Pre-1.0 releases are tagged per milestone as `vMAJOR.MINOR.PATCH-mN`.
 
 ## [Unreleased]
 
-Milestone 3 — **Knowledge Retrieval (RAG)**. Slated for release as `v0.3.0-m3`.
+_Nothing yet._
+
+## [0.3.0-m3] - 2026-07-29
+
+Milestone 3 — **Knowledge Retrieval (RAG)**.
 Retrieval-Augmented Generation added as replaceable infrastructure behind ports
 proven by contract suites, with an additive, config-toggled `ContextProvider`
 seam that leaves the M2 chat turn unchanged when RAG is disabled. All ten
@@ -212,6 +216,7 @@ vendor-neutral LLM provider abstraction. All nine milestone exit criteria met;
 - GitHub Actions workflow running, in order: ruff (lint + format), mypy,
   `import-linter` (dependency rule), and `pytest -m "not live"` with coverage.
 
-[Unreleased]: https://github.com/kishorhari/ai-chatbot/compare/v0.2.0-m2...HEAD
+[Unreleased]: https://github.com/kishorhari/ai-chatbot/compare/v0.3.0-m3...HEAD
+[0.3.0-m3]: https://github.com/kishorhari/ai-chatbot/compare/v0.2.0-m2...v0.3.0-m3
 [0.2.0-m2]: https://github.com/kishorhari/ai-chatbot/compare/v0.1.0-m1...v0.2.0-m2
 [0.1.0-m1]: https://github.com/kishorhari/ai-chatbot/releases/tag/v0.1.0-m1
