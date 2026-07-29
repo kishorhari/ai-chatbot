@@ -19,6 +19,14 @@ Milestone 2 (conversation & persistence):
 - [ADR-0009: Context-Window Selection and Prompt Assembly](adr/0009-context-window-and-prompt-assembly.md)
 - [ADR-0010: Application Service Layer (Use-Case Orchestration)](adr/0010-application-service-layer.md)
 
+Milestone 3 (knowledge retrieval / RAG) — **Accepted** (implementation begun, M3.0):
+- [ADR-0011: Knowledge & Retrieval Architecture (RAG)](adr/0011-knowledge-and-retrieval-architecture.md)
+- [ADR-0012: Embedding Provider Abstraction](adr/0012-embedding-provider-abstraction.md)
+- [ADR-0013: Vector Store Abstraction](adr/0013-vector-store-abstraction.md)
+- [ADR-0014: Chunking Strategy](adr/0014-chunking-strategy.md)
+- [ADR-0015: Retrieval Strategy & Prompt Enrichment](adr/0015-retrieval-and-prompt-enrichment.md)
+- [ADR-0016: Knowledge Metadata, Ingestion & Persistence](adr/0016-knowledge-metadata-ingestion-and-persistence.md)
+
 ## Milestone 1 — Project Skeleton + LLM Provider
 - [Development Roadmap](roadmap/milestone-1.md) — sub-milestones, file order, exit criteria
 - [File Dependency Matrix](file-dependency-matrix.md) — dependency graph + circular-risk analysis
@@ -35,6 +43,10 @@ Milestone 2 (conversation & persistence):
 - [Exit-Criteria Review](milestone-2-exit-review.md) — each §6 criterion mapped to evidence (M2.6)
 - [Retrospective](milestone-2-retrospective.md) — objective, concepts, ADRs, decisions, lessons
 - Governed by ADR-0007 (aggregate), ADR-0008 (persistence), ADR-0009 (memory/assembly), ADR-0010 (application-service layer).
+
+## Milestone 3 — Knowledge Retrieval / RAG (in design)
+- [Development Roadmap](roadmap/milestone-3.md) — scope, sub-milestones (M3.0–M3.8), file order, dependency graph, DoD, exit criteria, risks, trade-offs
+- Governed by proposed ADR-0011 (knowledge/retrieval), 0012 (embeddings), 0013 (vector store), 0014 (chunking), 0015 (retrieval & enrichment), 0016 (metadata/ingestion).
 
 ## Status
 Milestone 1 is **implemented and accepted** — all nine exit criteria met (see the
