@@ -8,7 +8,9 @@
 - **Refinement (owner-ratified):** `ChatService` orchestrates a single
   `ContextProvider` collaborator; it does not coordinate retrieval or enrichment
   itself. The `Retriever` and `PromptEnricher` are internal collaborators *of the
-  `ContextProvider`*, not of `ChatService`.
+  `ContextProvider`*, not of `ChatService`. The `ContextProvider` port +
+  `NullContextProvider` live in `application/conversation` (canonical, M3.5); the
+  `KnowledgeContextProvider` implementation lives in `application/knowledge`.
 
 ## Context
 
@@ -29,11 +31,20 @@ orchestrates a **single** application port —
 `ChatService` does **not** embed, search, or enrich itself, and gains no retrieval
 knowledge over time (owner-ratified refinement): it delegates the entire
 "obtain-and-enrich contextual knowledge" step to this one collaborator, then hands
-the result to the frozen `PromptAssembler`. Two implementations:
-- `NullContextProvider` — returns the messages unchanged (RAG off; the Null
-  Object). This is what keeps M2 behavior byte-for-byte identical.
-- `KnowledgeContextProvider` — composes the retrieval and enrichment internals
-  below and returns the augmented messages.
+the result to the frozen `PromptAssembler`.
+
+**Port placement (canonical, owner-ratified at M3.5).** The `ContextProvider`
+port and its `NullContextProvider` default live in **`application/conversation`**,
+beside their consumer `ChatService` — *not* in `application/knowledge`. The port's
+contract is conversation-`Message`-shaped and it is ChatService's seam, so this
+placement means **`ChatService` imports nothing from the `knowledge` package** and
+the dependency flows **knowledge → conversation** (the RAG feature depends on the
+core, never the reverse). The two implementations are:
+- `NullContextProvider` (in `application/conversation`) — returns the messages
+  unchanged (RAG off; the Null Object). This keeps M2 behavior byte-for-byte
+  identical and is the default when RAG is disabled.
+- `KnowledgeContextProvider` (in `application/knowledge`) — implements the
+  conversation-side port and composes the retrieval and enrichment internals below.
 
 **Retrieval (internal to the ContextProvider).** A `Retriever` port —
 `retrieve(query, filter, k) -> RetrievedContext` — with a `SemanticRetriever`
