@@ -49,14 +49,17 @@ dev = [
     "pytest-cov>=5.0",
     "respx>=0.21",
     "aiosqlite>=0.20",
+    "pgvector>=0.3",
     "ruff>=0.5",
     "mypy>=1.10",
     "import-linter>=2.0",
 ]
-# The PostgreSQL async driver. Required in production and in CI (postgres service
-# container); optional locally so a driverless dev box still installs cleanly.
+# The PostgreSQL async driver + pgvector SQLAlchemy integration. Required in
+# production and in CI (pgvector service container); optional locally so a
+# driverless dev box still installs cleanly.
 postgres = [
     "asyncpg>=0.30",
+    "pgvector>=0.3",
 ]
 
 # ---------------------------------------------------------------------------
@@ -109,6 +112,13 @@ plugins = ["pydantic.mypy"]
 
 # Inner layers are pure and cheap to type strictly — gaps here are unjustified
 # (testing-strategy: domain/application target >= 95% coverage and full typing).
+# pgvector is a Postgres-only extra (not installed on a driverless dev box); its
+# SQLAlchemy integration ships no stubs. Treat its imports as untyped so mypy
+# passes without it — the pgvector store is exercised only in CI.
+[[tool.mypy.overrides]]
+module = ["pgvector.*"]
+ignore_missing_imports = true
+
 [[tool.mypy.overrides]]
 module = ["aiplatform.domain.*", "aiplatform.application.*"]
 disallow_any_generics = true

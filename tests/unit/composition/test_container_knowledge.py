@@ -59,8 +59,10 @@ async def test_enabled_wires_knowledge_and_retrieval_round_trips() -> None:
         await container.aclose()
 
 
-def test_pgvector_backend_fails_fast() -> None:
-    with pytest.raises(ValueError, match="not available yet"):
+def test_pgvector_backend_without_dsn_fails_fast() -> None:
+    # Selecting pgvector without a configured DSN fails fast with a clear message,
+    # before the pgvector driver is even imported (so it holds on a driverless box).
+    with pytest.raises(ValueError, match="requires AIP__PERSISTENCE__POSTGRES__DSN"):
         build_container(_settings(enabled=True, vector={"backend": "pgvector"}))
 
 
