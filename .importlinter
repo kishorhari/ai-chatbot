@@ -7,6 +7,9 @@
 
 [importlinter]
 root_package = aiplatform
+# Include external packages so the contracts below can forbid the inner layers
+# from importing third-party persistence libraries by name (ADR-0008).
+include_external_packages = True
 
 # -----------------------------------------------------------------------------
 # Contract 1 — core layered ordering (domain < application < infrastructure).
@@ -53,17 +56,19 @@ forbidden_modules =
 # this is what enables request-boundary correlation-id propagation.
 # -----------------------------------------------------------------------------
 [importlinter:contract:interface-no-adapters]
-name = Interface must not import provider adapters or config
+name = Interface must not import provider, persistence, or config adapters
 type = forbidden
 # Only DIRECT imports are forbidden: the interface reaching infrastructure
 # transitively *through the composition root* is the sanctioned path (that is
-# what composition exists for). A route that imports a concrete adapter or reads
-# config itself is a direct import and is rejected.
+# what composition exists for). A route that imports a concrete adapter (LLM
+# provider or persistence repository) or reads config itself is a direct import
+# and is rejected — delivery receives those, ports-only, from the container.
 allow_indirect_imports = True
 source_modules =
     aiplatform.interface
 forbidden_modules =
     aiplatform.infrastructure.llm
+    aiplatform.infrastructure.persistence
     aiplatform.infrastructure.config
 
 # -----------------------------------------------------------------------------
@@ -81,3 +86,22 @@ source_modules =
     aiplatform.infrastructure.config
 forbidden_modules =
     aiplatform.infrastructure.logging
+
+# -----------------------------------------------------------------------------
+# Contract 5 — the domain and application layers must remain persistence-agnostic.
+#
+# No SQLAlchemy / asyncpg / Alembic import may appear in domain or application
+# (ADR-0008): persistence is an infrastructure detail behind the repository port.
+# The layered contract already blocks importing the persistence *adapter*; this
+# additionally forbids importing the third-party libraries directly.
+# -----------------------------------------------------------------------------
+[importlinter:contract:core-persistence-agnostic]
+name = Domain and application must not import SQLAlchemy, asyncpg, or Alembic
+type = forbidden
+source_modules =
+    aiplatform.domain
+    aiplatform.application
+forbidden_modules =
+    sqlalchemy
+    asyncpg
+    alembic

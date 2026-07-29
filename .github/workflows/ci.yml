@@ -15,6 +15,29 @@ jobs:
   quality:
     name: Lint, type-check, dependency rule, tests
     runs-on: ubuntu-latest
+
+    # A real PostgreSQL, so the repository contract suite proves the swap on every
+    # push rather than merely asserting it (ADR-0008).
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: aiplatform
+          POSTGRES_PASSWORD: aiplatform
+          POSTGRES_DB: aiplatform_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aiplatform"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # asyncpg DSN consumed by the postgres repository contract suite and Alembic.
+      AIP__TEST_POSTGRES_DSN: postgresql+asyncpg://aiplatform:aiplatform@localhost:5432/aiplatform_test
+      AIP__PERSISTENCE__POSTGRES__DSN: postgresql+asyncpg://aiplatform:aiplatform@localhost:5432/aiplatform_test
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,10 +48,10 @@ jobs:
           python-version: "3.13"
           cache: pip
 
-      - name: Install package (with dev extras)
+      - name: Install package (with dev + postgres extras)
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install -e ".[dev,postgres]"
 
       # Gate order mirrors the git-strategy PR checklist:
       # lint -> type-check -> dependency rule -> tests.
@@ -43,6 +66,12 @@ jobs:
       - name: Dependency rule (import-linter)
         run: lint-imports
 
-      # Live Ollama tests are opt-in and intentionally excluded from required CI.
-      - name: Tests (unit + contract + respx integration)
+      # Validate the Alembic migration applies against the real database.
+      - name: Migrate (alembic upgrade head)
+        run: alembic upgrade head
+
+      # Runs everything except opt-in live Ollama tests. The PostgreSQL repository
+      # contract suite runs here because AIP__TEST_POSTGRES_DSN is set (it skips
+      # locally without it).
+      - name: Tests (unit + contract incl. real PostgreSQL + respx integration)
         run: pytest -m "not live" --cov=aiplatform --cov-report=term-missing
