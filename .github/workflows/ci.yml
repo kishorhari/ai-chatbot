@@ -16,11 +16,12 @@ jobs:
     name: Lint, type-check, dependency rule, tests
     runs-on: ubuntu-latest
 
-    # A real PostgreSQL, so the repository contract suite proves the swap on every
-    # push rather than merely asserting it (ADR-0008).
+    # A real PostgreSQL **with pgvector**, so the repository and vector-store
+    # contract suites prove the swap on every push rather than merely asserting it
+    # (ADR-0008/0013). The pgvector image ships the `vector` extension.
     services:
       postgres:
-        image: postgres:16
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: aiplatform
           POSTGRES_PASSWORD: aiplatform

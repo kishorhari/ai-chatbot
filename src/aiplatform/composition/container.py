@@ -191,7 +191,7 @@ def _build_knowledge(
         return None, None, ()
 
     embedder = _build_embedder(settings)
-    vector_store, knowledge_repository = _build_knowledge_stores(settings)
+    vector_store, knowledge_repository, store_disposables = _build_knowledge_stores(settings)
     estimator = HeuristicTokenEstimator()
     chunker = TokenAwareChunker(
         estimator,
@@ -219,8 +219,8 @@ def _build_knowledge(
     knowledge = KnowledgeComponents(
         indexing_service=indexing_service, retrieval_service=retrieval_service
     )
-    disposables = tuple(
-        component for component in (embedder, vector_store) if isinstance(component, _Closeable)
+    disposables = store_disposables + tuple(
+        component for component in (embedder,) if isinstance(component, _Closeable)
     )
     return knowledge, context_provider, disposables
 
@@ -242,18 +242,46 @@ def _build_embedder(settings: AppSettings) -> EmbeddingProvider:
 
 def _build_knowledge_stores(
     settings: AppSettings,
-) -> tuple[VectorStore, KnowledgeRepository]:
+) -> tuple[VectorStore, KnowledgeRepository, tuple[_Closeable, ...]]:
     """Select the vector store + knowledge record store by configuration (ADR-0013).
 
-    The two co-locate under one backend choice (ADR-0016). Only in-memory is wired
-    today; ``pgvector`` fails fast until M3.7.
+    The two co-locate under one backend choice (ADR-0016): in-memory needs no
+    disposal; pgvector shares one SQLAlchemy engine (a disposable) between the
+    vector store and the record repository, reusing the M2 SessionProvider.
     """
     backend = settings.knowledge.vector.backend
     if backend is VectorBackend.MEMORY:
-        return InMemoryVectorStore(), InMemoryKnowledgeRepository()
-    raise ValueError(
-        f"vector backend {backend.value!r} is not available yet; pgvector arrives in M3.7"
+        return InMemoryVectorStore(), InMemoryKnowledgeRepository(), ()
+    if backend is VectorBackend.PGVECTOR:
+        return _build_pgvector_stores(settings)
+    raise ValueError(f"unknown vector backend {backend.value!r}")
+
+
+def _build_pgvector_stores(
+    settings: AppSettings,
+) -> tuple[VectorStore, KnowledgeRepository, tuple[_Closeable, ...]]:
+    """Wire the pgvector store + SQLAlchemy knowledge repository over one engine.
+
+    Imported locally so the pgvector/asyncpg dependency is only required when this
+    backend is selected. Reuses the M2 ``SessionProvider`` and the persistence DSN
+    (the record store and vectors co-locate in one PostgreSQL, ADR-0016). The DSN is
+    checked before the driver import so a misconfiguration fails fast with a clear
+    message even where the pgvector driver is absent.
+    """
+    dsn = settings.persistence.postgres.dsn
+    if dsn is None:
+        raise ValueError("vector backend 'pgvector' requires AIP__PERSISTENCE__POSTGRES__DSN")
+
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    from aiplatform.infrastructure.knowledge.repository.sqlalchemy.repository import (
+        SqlAlchemyKnowledgeRepository,
     )
+    from aiplatform.infrastructure.knowledge.vector.pgvector.store import PgVectorStore
+
+    engine = create_async_engine(dsn.get_secret_value())
+    provider = SessionProvider(engine)
+    return PgVectorStore(provider), SqlAlchemyKnowledgeRepository(provider), (provider,)
 
 
 def _build_providers(settings: AppSettings) -> dict[str, LLMProvider]:
