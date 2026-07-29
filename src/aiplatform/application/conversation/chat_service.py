@@ -34,6 +34,7 @@ from aiplatform.domain.conversation.ids import ConversationId, MessageId
 from aiplatform.domain.conversation.ports import ConversationRepository
 from aiplatform.domain.llm.responses import FinishReason, TokenUsage
 
+from .context_provider import ContextProvider, NullContextProvider
 from .context_window import ContextWindowPolicy
 from .prompt_assembler import PromptAssembler
 from .transaction import TransactionBoundary
@@ -77,14 +78,20 @@ class ChatService:
         context_window: ContextWindowPolicy,
         prompt_assembler: PromptAssembler,
         transactions: TransactionBoundary,
+        context_provider: ContextProvider | None = None,
     ) -> None:
-        """Inject collaborators; store no per-request state."""
+        """Inject collaborators; store no per-request state.
+
+        ``context_provider`` defaults to :class:`NullContextProvider` (RAG off), so
+        wiring it is opt-in and, when absent, behaviour is identical to M2.
+        """
         self._repository = repository
         self._clock = clock
         self._provider_registry = provider_registry
         self._context_window = context_window
         self._prompt_assembler = prompt_assembler
         self._transactions = transactions
+        self._context_provider = context_provider or NullContextProvider()
 
     async def send_message(
         self, conversation_id: ConversationId, text: str, *, model: str | None = None
@@ -114,7 +121,12 @@ class ChatService:
         windowed = self._context_window.select(
             conversation.messages, max_context_tokens=capabilities.max_context_tokens
         )
-        request = self._prompt_assembler.assemble(windowed, model=model)
+        # Delegate context acquisition + enrichment to one collaborator (ADR-0015).
+        # With the NullContextProvider default this returns `windowed` unchanged.
+        enriched = await self._context_provider.enrich(
+            windowed, query=text, max_context_tokens=capabilities.max_context_tokens
+        )
+        request = self._prompt_assembler.assemble(enriched, model=model)
 
         # Generation runs OUTSIDE the transaction: it is slow and cancellable, and
         # holding a transaction across it would pin a connection and extend locks.
