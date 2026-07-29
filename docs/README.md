@@ -19,7 +19,7 @@ Milestone 2 (conversation & persistence):
 - [ADR-0009: Context-Window Selection and Prompt Assembly](adr/0009-context-window-and-prompt-assembly.md)
 - [ADR-0010: Application Service Layer (Use-Case Orchestration)](adr/0010-application-service-layer.md)
 
-Milestone 3 (knowledge retrieval / RAG) — **Accepted** (implementation begun, M3.0):
+Milestone 3 (knowledge retrieval / RAG) — **Accepted & implemented** (M3.0–M3.8):
 - [ADR-0011: Knowledge & Retrieval Architecture (RAG)](adr/0011-knowledge-and-retrieval-architecture.md)
 - [ADR-0012: Embedding Provider Abstraction](adr/0012-embedding-provider-abstraction.md)
 - [ADR-0013: Vector Store Abstraction](adr/0013-vector-store-abstraction.md)
@@ -44,16 +44,25 @@ Milestone 3 (knowledge retrieval / RAG) — **Accepted** (implementation begun, 
 - [Retrospective](milestone-2-retrospective.md) — objective, concepts, ADRs, decisions, lessons
 - Governed by ADR-0007 (aggregate), ADR-0008 (persistence), ADR-0009 (memory/assembly), ADR-0010 (application-service layer).
 
-## Milestone 3 — Knowledge Retrieval / RAG (in design)
+## Milestone 3 — Knowledge Retrieval / RAG
 - [Development Roadmap](roadmap/milestone-3.md) — scope, sub-milestones (M3.0–M3.8), file order, dependency graph, DoD, exit criteria, risks, trade-offs
-- Governed by proposed ADR-0011 (knowledge/retrieval), 0012 (embeddings), 0013 (vector store), 0014 (chunking), 0015 (retrieval & enrichment), 0016 (metadata/ingestion).
+- [Exit-Criteria Review](milestone-3-exit-review.md) — each §7 criterion mapped to evidence (M3.8)
+- [Retrospective](milestone-3-retrospective.md) — objective, concepts, ADRs, decisions, lessons
+- [Release Readiness Review](milestone-3-release-readiness.md) — gates, risk posture, and the `v0.3.0-m3` tag recommendation
+- Governed by ADR-0011 (knowledge/retrieval), 0012 (embeddings), 0013 (vector store), 0014 (chunking), 0015 (retrieval & enrichment), 0016 (metadata/ingestion).
 
 ## Status
-Milestone 1 is **implemented and accepted** — all nine exit criteria met (see the
-exit review). The codebase ships a vertically-sliced foundation: config/logging,
-domain contracts, two providers behind one contract suite, composition wiring,
-and HTTP + CLI delivery. Architecture remains ratified and unchanged; M1.7 added
-only validation and documentation.
+Milestones 1, 2, and 3 are **implemented and accepted** (M1/M2 tagged
+`v0.1.0-m1` / `v0.2.0-m2`; M3 proposed for `v0.3.0-m3`). The codebase ships the
+Clean-Architecture foundation (M1), conversation identity + durable history
+behind a repository port proven across in-memory/SQLite/PostgreSQL (M2), and
+Retrieval-Augmented Generation (M3): a `KnowledgeDocument` aggregate, embedding /
+vector-store / knowledge-repository ports each proven by a shared contract suite
+(pgvector and PostgreSQL in CI), an additive `ContextProvider` seam on
+`ChatService` (Null Object default — M2 behaviour is byte-for-byte preserved when
+RAG is off), and a deterministic golden-dataset retrieval quality gate. Six
+`import-linter` contracts enforce the dependency rule; the frozen M1/M2 ports are
+unchanged.
 
 ## How to use this package (implementation engineer)
 1. Read all five ADRs, then the roadmap.
