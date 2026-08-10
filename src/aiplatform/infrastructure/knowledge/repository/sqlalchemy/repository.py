@@ -34,11 +34,21 @@ class SqlAlchemyKnowledgeRepository(KnowledgeRepository):
         self._provider = provider
 
     async def add(self, document: KnowledgeDocument) -> None:
-        """Insert a new document and all its chunks."""
+        """Insert a new document and all its chunks.
+
+        The document row is flushed before its chunks so the child INSERTs never
+        precede the parent: PostgreSQL enforces the ``document_id`` foreign key
+        immediately, and SQLAlchemy's unit of work does not order the two mappers
+        on its own (there is no ORM relationship between them). Without the flush
+        the chunk INSERTs can race ahead of the document row and violate the FK —
+        a fault SQLite masks because it does not enforce foreign keys by default.
+        The whole unit still commits atomically when the session scope exits.
+        """
         async with self._provider.session() as session:
             if await session.get(KnowledgeDocumentRow, document.id.value) is not None:
                 raise KnowledgeDocumentAlreadyExistsError(document.id)
             session.add(document_to_row(document))
+            await session.flush()  # emit the parent INSERT before the child chunks
             for chunk in document.chunks:
                 session.add(chunk_to_row(document.id, chunk))
 
