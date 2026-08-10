@@ -21,7 +21,7 @@ from __future__ import annotations
 from enum import StrEnum
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -48,6 +48,17 @@ class LogFormat(StrEnum):
 
     CONSOLE = "console"
     JSON = "json"
+
+
+class PersistenceBackend(StrEnum):
+    """Selectable conversation-persistence backend (ADR-0008).
+
+    ``postgres`` is a valid, documented value but is only wired from M2.5; the
+    composition root fails fast if it is selected before then.
+    """
+
+    MEMORY = "memory"
+    POSTGRES = "postgres"
 
 
 class ServerSettings(BaseModel):
@@ -124,6 +135,112 @@ class OllamaSettings(BaseModel):
         return value.rstrip("/")
 
 
+class PostgresSettings(BaseModel):
+    """PostgreSQL connection configuration.
+
+    ``dsn`` is the full async SQLAlchemy URL (e.g.
+    ``postgresql+asyncpg://user:password@host:5432/dbname``). It is a
+    :class:`SecretStr` because it embeds the password — it is never logged or
+    reprinted (ADR-0008). Required only when the ``postgres`` backend is selected.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    dsn: SecretStr | None = None
+
+
+class PersistenceSettings(BaseModel):
+    """Conversation-persistence configuration.
+
+    Selecting the backend is a configuration change only (ADR-0008), mirroring
+    provider selection.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    backend: PersistenceBackend = PersistenceBackend.MEMORY
+    postgres: PostgresSettings = Field(default_factory=PostgresSettings)
+
+
+class EmbeddingBackend(StrEnum):
+    """Selectable embedding backend (ADR-0012)."""
+
+    FAKE = "fake"
+    OLLAMA = "ollama"
+
+
+class VectorBackend(StrEnum):
+    """Selectable vector-store backend (ADR-0013).
+
+    ``pgvector`` is a documented value wired from M3.7; selecting it before then
+    fails fast at the composition root.
+    """
+
+    MEMORY = "memory"
+    PGVECTOR = "pgvector"
+
+
+class EmbeddingSettings(BaseModel):
+    """Embedding provider configuration (ADR-0012)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    backend: EmbeddingBackend = EmbeddingBackend.FAKE
+    model: str = "nomic-embed-text"  # used by the Ollama backend
+    dimension: int = Field(default=768, gt=0)
+
+
+class VectorSettings(BaseModel):
+    """Vector-store configuration (ADR-0013)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    backend: VectorBackend = VectorBackend.MEMORY
+
+
+class ChunkSettings(BaseModel):
+    """Chunking parameters (ADR-0014)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    size_tokens: int = Field(default=512, gt=0)
+    overlap_tokens: int = Field(default=64, ge=0)
+
+    @model_validator(mode="after")
+    def _overlap_below_size(self) -> ChunkSettings:
+        """Overlap must be strictly smaller than the chunk size (progress)."""
+        if self.overlap_tokens >= self.size_tokens:
+            raise ValueError("chunk overlap_tokens must be < size_tokens")
+        return self
+
+
+class RetrievalSettings(BaseModel):
+    """Retrieval + enrichment policy (ADR-0015)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    k: int = Field(default=5, gt=0)
+    min_score: float = Field(default=0.0, ge=-1.0, le=1.0)
+    context_token_budget: int = Field(default=1024, ge=0)
+
+
+class KnowledgeSettings(BaseModel):
+    """Knowledge / RAG configuration (ADR-0011).
+
+    ``enabled`` toggles the whole feature at the composition root: when off, the
+    chat turn uses the ``NullContextProvider`` (behaviour identical to M2) and the
+    knowledge services are not built. Selecting backends is config-only.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    enabled: bool = False
+    embedding: EmbeddingSettings = Field(default_factory=EmbeddingSettings)
+    vector: VectorSettings = Field(default_factory=VectorSettings)
+    chunk: ChunkSettings = Field(default_factory=ChunkSettings)
+    retrieval: RetrievalSettings = Field(default_factory=RetrievalSettings)
+
+
 class AppSettings(BaseSettings):
     """Root settings aggregate, populated from the environment and ``.env``.
 
@@ -148,6 +265,8 @@ class AppSettings(BaseSettings):
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     llm: LLMSettings = Field(default_factory=LLMSettings)
     ollama: OllamaSettings = Field(default_factory=OllamaSettings)
+    persistence: PersistenceSettings = Field(default_factory=PersistenceSettings)
+    knowledge: KnowledgeSettings = Field(default_factory=KnowledgeSettings)
 
     @property
     def is_local(self) -> bool:

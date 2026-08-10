@@ -7,13 +7,24 @@ build-backend = "hatchling.build"
 # ---------------------------------------------------------------------------
 [project]
 name = "aiplatform"
-version = "0.1.0"
+version = "0.3.0"
 description = "Enterprise AI assistant platform — Clean Architecture core with a provider-agnostic LLM port."
 readme = "README.md"
 requires-python = ">=3.13"
-license = { text = "Proprietary" }
-authors = [{ name = "AI Platform Team" }]
-keywords = ["clean-architecture", "llm", "ollama", "fastapi"]
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "kishorhari" }]
+keywords = [
+    "clean-architecture",
+    "hexagonal-architecture",
+    "ports-and-adapters",
+    "llm",
+    "ollama",
+    "fastapi",
+    "pydantic",
+    "structlog",
+    "ai-platform",
+]
 
 # Runtime deps only. Per ADR-0002 nothing above the infrastructure layer may
 # import a vendor SDK or httpx; these libraries are wired strictly behind ports.
@@ -24,6 +35,11 @@ dependencies = [
     "structlog>=24.1",
     "httpx>=0.27",
     "uvicorn[standard]>=0.30",
+    # Persistence (infrastructure only; ADR-0008). SQLAlchemy async core + Alembic
+    # migrations are pure-Python. The asyncpg driver lives in the `postgres` extra
+    # so local/dev installs never require a C toolchain; CI installs it explicitly.
+    "sqlalchemy[asyncio]>=2.0",
+    "alembic>=1.13",
 ]
 
 [project.optional-dependencies]
@@ -32,9 +48,18 @@ dev = [
     "pytest-asyncio>=0.23",
     "pytest-cov>=5.0",
     "respx>=0.21",
+    "aiosqlite>=0.20",
+    "pgvector>=0.3",
     "ruff>=0.5",
     "mypy>=1.10",
     "import-linter>=2.0",
+]
+# The PostgreSQL async driver + pgvector SQLAlchemy integration. Required in
+# production and in CI (pgvector service container); optional locally so a
+# driverless dev box still installs cleanly.
+postgres = [
+    "asyncpg>=0.30",
+    "pgvector>=0.3",
 ]
 
 # ---------------------------------------------------------------------------
@@ -50,10 +75,6 @@ packages = ["src/aiplatform"]
 line-length = 100
 target-version = "py313"
 src = ["src", "tests"]
-# `app/` is a pre-architecture prototype, outside the approved src/aiplatform
-# structure and out of Milestone 1 scope. Excluded from the new tooling; slated
-# for removal in a later chore commit.
-extend-exclude = ["app"]
 
 [tool.ruff.lint]
 # E/F pyflakes+pycodestyle, I import sorting, N naming, UP pyupgrade,
@@ -65,6 +86,9 @@ ignore = ["D203", "D213"] # mutually-exclusive docstring rules; pick the modern 
 # Tests favour readability over annotation/docstring ceremony.
 "tests/**" = ["D", "ANN"]
 "**/__init__.py" = ["D104"] # package docstring optional on namespace inits
+# Alembic migrations are semi-generated; relax docstring/annotation/naming rules
+# (revision filenames start with the revision id).
+"migrations/**" = ["D", "ANN", "N999"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -88,6 +112,13 @@ plugins = ["pydantic.mypy"]
 
 # Inner layers are pure and cheap to type strictly — gaps here are unjustified
 # (testing-strategy: domain/application target >= 95% coverage and full typing).
+# pgvector is a Postgres-only extra (not installed on a driverless dev box); its
+# SQLAlchemy integration ships no stubs. Treat its imports as untyped so mypy
+# passes without it — the pgvector store is exercised only in CI.
+[[tool.mypy.overrides]]
+module = ["pgvector.*"]
+ignore_missing_imports = true
+
 [[tool.mypy.overrides]]
 module = ["aiplatform.domain.*", "aiplatform.application.*"]
 disallow_any_generics = true
@@ -106,6 +137,7 @@ testpaths = ["tests"]
 addopts = "-ra"
 markers = [
     "live: opt-in tests requiring a running Ollama instance (deselect with -m 'not live')",
+    "postgres: repository contract run against a real PostgreSQL (CI service container; skipped without AIP__TEST_POSTGRES_DSN)",
 ]
 
 # ---------------------------------------------------------------------------
