@@ -33,7 +33,12 @@ async def test_container_wires_conversation_services() -> None:
         await container.aclose()
 
 
-def test_postgres_backend_without_dsn_fails_fast() -> None:
+def test_postgres_backend_without_dsn_fails_fast(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The fail-fast precondition is that no DSN is configured. CI exports
+    # AIP__PERSISTENCE__POSTGRES__DSN for the real-database suites, and
+    # pydantic-settings still reads os.environ even with _env_file=None, so remove
+    # it explicitly here rather than assuming the environment is clean.
+    monkeypatch.delenv("AIP__PERSISTENCE__POSTGRES__DSN", raising=False)
     with pytest.raises(ValueError, match="requires AIP__PERSISTENCE__POSTGRES__DSN"):
         build_container(_settings(persistence={"backend": "postgres"}))
 
