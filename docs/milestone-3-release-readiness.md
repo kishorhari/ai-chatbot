@@ -9,7 +9,50 @@ limitations shipping *by design*, and the concrete release actions.
 
 ---
 
+## 0. Addendum — first real CI run exposed defects (2026-08-10, M3.9)
+
+**The original §1 recommendation below claimed the pgvector/PostgreSQL swap was
+"proven in CI." That claim was premature and is corrected here — it is left in
+place rather than rewritten, so the record is honest.**
+
+When the M3 work was finally placed on a ref the CI workflow triggers on (PR
+`feat/chat-service → main`, #1), the mandatory production-persistence suites ran
+against the real `pgvector/pgvector:pg16` service for the **first time** — the
+`main` branch had never advanced past M1, so this M2+M3 code had never actually
+executed in CI. The run (`31383581550`) **failed**: `19 failed, 502 passed, 0
+skipped`. The suites did *run* (not skip), which is the good news; they exposed
+three genuine defects:
+
+- **A — pgvector upsert** (`AttributeError: 'MetaData' object has no attribute
+  '_bulk_update_tuples'`): the `on_conflict_do_update` was built against the ORM
+  entity, so the `"metadata"` key was misresolved to SQLAlchemy's reserved
+  declarative `.metadata`. **Fixed** by constructing the upsert at the Core-table
+  level (keys resolve as column names); DB column name unchanged.
+- **B — knowledge-repository FK ordering** (`asyncpg.ForeignKeyViolationError`):
+  chunk INSERTs raced ahead of the parent document because the unit of work does
+  not order the two mappers without a relationship. **Masked on SQLite**, which
+  does not enforce foreign keys by default. **Fixed** by flushing the document
+  before the chunks; the local SQLite contract fixture now enables
+  `PRAGMA foreign_keys=ON` so this fault can no longer hide locally.
+- **C — DSN fail-fast test isolation**: `test_pgvector_backend_without_dsn_fails_fast`
+  and `test_postgres_backend_without_dsn_fails_fast` (the latter an **M2** test —
+  confirming M2's PostgreSQL path had likewise never truly run green in CI)
+  assumed no DSN, but CI exports `AIP__PERSISTENCE__POSTGRES__DSN`. **Fixed** in
+  the tests (explicit `monkeypatch.delenv`); production fail-fast behaviour is
+  unchanged.
+
+All three are fixed on branch `fix/m3-postgres-release-hardening`; local gates are
+green and A/B/C were each reproduced locally before fixing. **The M3 release gate
+remains OPEN until a corrected CI run shows both mandatory suites RUN and PASS
+(not skipped).** `v0.3.0-m3` must not be tagged/released against `45dfdb7`; the
+release will move to the corrected commit once CI is green.
+
+---
+
 ## 1. Recommendation
+
+> ⚠️ **Superseded by §0 (2026-08-10).** The "proven in CI" claim below was premature;
+> the first real CI run failed and the gate is now OPEN pending a corrected run.
 
 **GO — tag `v0.3.0-m3`.** Every Milestone 3 exit criterion is met with mapped
 evidence (see the [exit review](milestone-3-exit-review.md)); all local gates are
