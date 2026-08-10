@@ -59,9 +59,13 @@ async def test_enabled_wires_knowledge_and_retrieval_round_trips() -> None:
         await container.aclose()
 
 
-def test_pgvector_backend_without_dsn_fails_fast() -> None:
+def test_pgvector_backend_without_dsn_fails_fast(monkeypatch: pytest.MonkeyPatch) -> None:
     # Selecting pgvector without a configured DSN fails fast with a clear message,
     # before the pgvector driver is even imported (so it holds on a driverless box).
+    # CI exports AIP__PERSISTENCE__POSTGRES__DSN for the real-database suites, and
+    # pydantic-settings reads os.environ even with _env_file=None, so remove it
+    # explicitly — the precondition under test is precisely "no DSN configured".
+    monkeypatch.delenv("AIP__PERSISTENCE__POSTGRES__DSN", raising=False)
     with pytest.raises(ValueError, match="requires AIP__PERSISTENCE__POSTGRES__DSN"):
         build_container(_settings(enabled=True, vector={"backend": "pgvector"}))
 
