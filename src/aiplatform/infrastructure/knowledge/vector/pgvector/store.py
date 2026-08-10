@@ -15,8 +15,9 @@ consistent with the in-memory store); ANN indexing is deferred (ADR-0013).
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import cast
 
-from sqlalchemy import select
+from sqlalchemy import Table, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from aiplatform.domain.knowledge.errors import DimensionMismatchError
@@ -54,14 +55,18 @@ class PgVectorStore(VectorStore):
         if not rows:
             return
         async with self._provider.session() as session:
-            statement = pg_insert(KnowledgeVectorRow).values(rows)
+            # Build the upsert against the Core table (not the ORM entity) so the
+            # keys are resolved as column names. The "metadata" column collides with
+            # SQLAlchemy's reserved declarative ``.metadata`` attribute (the Python
+            # attribute is ``chunk_metadata``), which an ORM-entity insert would
+            # misresolve; the Core table keys by column name and sidesteps that.
+            table = cast(Table, KnowledgeVectorRow.__table__)
+            statement = pg_insert(table).values(rows)
             statement = statement.on_conflict_do_update(
-                index_elements=["chunk_id"],
+                index_elements=[table.c.chunk_id],
                 set_={
-                    "document_id": statement.excluded.document_id,
-                    "embedding": statement.excluded.embedding,
-                    "text": statement.excluded.text,
-                    "metadata": statement.excluded.metadata,
+                    column: statement.excluded[column]
+                    for column in ("document_id", "embedding", "text", "metadata")
                 },
             )
             await session.execute(statement)
