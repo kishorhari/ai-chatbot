@@ -10,7 +10,7 @@ Pre-1.0 releases are tagged per milestone as `vMAJOR.MINOR.PATCH-mN`.
 
 _Nothing yet._
 
-## [0.3.0-m3] - 2026-07-29
+## [0.3.0-m3] - 2026-08-10
 
 Milestone 3 — **Knowledge Retrieval (RAG)**.
 Retrieval-Augmented Generation added as replaceable infrastructure behind ports
@@ -85,6 +85,27 @@ PostgreSQL + pgvector in CI (`pgvector/pgvector:pg16` service container).
 - `pgvector>=0.3` added to the `dev` and `postgres` optional-dependency extras; a
   mypy override ignores its missing type stubs. The CI PostgreSQL service image is
   `pgvector/pgvector:pg16` so the vector extension is available.
+
+### Fixed
+
+**PostgreSQL / pgvector release hardening (M3.9)** — the first real CI run of the
+M3 code against `pgvector/pgvector:pg16` (PR #1) exposed three defects that the
+offline suites had masked. All are fixed with no change to any port or to the
+`domain` / `application` layers (see `docs/milestone-3-release-readiness.md` §0).
+- **pgvector upsert metadata mapping** — `PgVectorStore.upsert` built its
+  `ON CONFLICT DO UPDATE` against the ORM entity, so the `"metadata"` key resolved
+  to SQLAlchemy's reserved declarative `.metadata` and raised `AttributeError`.
+  The upsert is now built at the Core-table level; the DB column name is unchanged.
+  A regression test exercises insert-then-conflict-update on real pgvector.
+- **Knowledge-repository foreign-key ordering** — chunk `INSERT`s could precede the
+  parent `knowledge_documents` row, violating the `document_id` foreign key on
+  PostgreSQL. The document row is now flushed before its chunks (the unit still
+  commits atomically). The SQLite contract fixture enables `PRAGMA foreign_keys=ON`
+  so this ordering fault is caught locally rather than only in CI.
+- **DSN fail-fast test isolation** — the Postgres/pgvector "no DSN configured"
+  composition tests explicitly unset `AIP__PERSISTENCE__POSTGRES__DSN`, so they no
+  longer fail when the environment (e.g. CI) exports one. Production fail-fast
+  behaviour is unchanged.
 
 ## [0.2.0-m2] - 2026-07-29
 
